@@ -13,26 +13,38 @@ const genl_routes = require('./router/general.js').general;
 const app = express();
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: true })); // For parsing application/x-www-form-urlencoded
 
-app.use("/customer",session({secret:"fingerprint_customer",resave: true, saveUninitialized: true}))
+app.use("/customer",
+	session({
+		secret:"fingerprint_customer",
+		resave: true, 
+		saveUninitialized: true}) 
+	);
+// first forgot the 'true}));'' that made login not work
 
 // Middleware to authenticate requests to "/customer/auth/*" endpoint
 app.use("/customer/auth/*", function auth(req,res,next){
-    if (req.session.authorization) {
-        let token = req.session.authorization['accessToken'];
+    const authHeader = req.headers['authorization']; // Get the Authorization header
+    const token = authHeader && authHeader.split(' ')[1]; // Extract the token from the header
+
+    if (token == null) {
+        return res.status(401).json({ message: "no Authorization provided. user not logged in" });
+    } // If there is no token, return 401
+    else {
+        console.log("That's the token submitted: ", token)
 
         // Verify JWT token
-        jwt.verify(token, "access", (err, user) => {
+        jwt.verify(token, "access", (err, payload) => {
             if (!err) {
-                req.user = user;
+                 // `payload` contains the data you signed, including the username
+                req.user = { username: payload.username }; // This needs to match how you're signing the JWT
                 next(); // Proceed to the next middleware
             } else {
                 return res.status(403).json({ message: "User not authenticated" });
             }
         });
-    } else {
-        return res.status(403).json({ message: "User not logged in" });
-    }
+    } 
  });
 
 
